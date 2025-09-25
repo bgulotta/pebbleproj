@@ -3,6 +3,8 @@
 static Window *s_window;
 static TextLayer *s_time_layer;
 static GFont s_time_font;
+static BitmapLayer *s_background_layer;
+static GBitmap *s_background_bitmap;
 
 static void update_time() {
   // Get a tm structure
@@ -24,8 +26,18 @@ static void main_window_load(Window *window){
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
 
+  // Create GBitmap
+  s_background_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BACKGROUND);
+
+  // Create BitmapLayer to display the GBitmap
+  s_background_layer = bitmap_layer_create(bounds);
+
+  // Set the bitmap onto the layer and add to the window
+  bitmap_layer_set_bitmap(s_background_layer, s_background_bitmap);
+  layer_add_child(window_layer, bitmap_layer_get_layer(s_background_layer));
+
   // Create GFont
-  s_time_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_MONTSERRAT_38));
+  s_time_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_MONTSERRAT_48));
 
   // Create the TextLayer with specific bounds
   s_time_layer = text_layer_create(GRect(0, PBL_IF_ROUND_ELSE(58,52), bounds.size.w, 50));
@@ -41,6 +53,12 @@ static void main_window_load(Window *window){
 }
 
 static void main_window_unload(Window *window){
+  // Destroy GBitmap
+  gbitmap_destroy(s_background_bitmap);
+
+  // Destroy BitmapLayer
+  bitmap_layer_destroy(s_background_layer);
+
   // Unload GFont
   fonts_unload_custom_font(s_time_font);
 
@@ -55,6 +73,8 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 static void init() {
   // Create main Window element and assign to pointer
   s_window = window_create();
+
+  window_set_background_color(s_window, GColorBlack);
 
   // Set handlers to manage the elements inside the Window
   window_set_window_handlers(s_window, (WindowHandlers){
