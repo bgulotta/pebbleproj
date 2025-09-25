@@ -23,7 +23,14 @@
       "dummy"
     ],
     "resources": {
-      "media": []
+      "media": [
+  {
+    "type": "font",
+    "name": "FONT_MONTSERRAT_38",
+    "file": "fonts/Montserrat-VariableFont_wght.ttf",
+    "compatibility":"2.7"
+  }
+]
     }
   }
 }
