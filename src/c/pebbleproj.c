@@ -32,9 +32,6 @@ static void main_window_load(Window *window){
   text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
 
-  // Make sure the time is displayed from the start
-  update_time();
-
   // Add it as a child layer to the Window's root layer
   layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
 }
@@ -63,6 +60,9 @@ static void init() {
 
   // Show the window on the watch with animated=true
   window_stack_push(s_window, true);
+
+  // Show current time
+  update_time();
 }
 
 static void deinit() {
