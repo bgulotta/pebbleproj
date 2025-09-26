@@ -5,6 +5,7 @@
   "keywords": ["pebble-app"],
   "private": true,
   "dependencies": {},
+  "capabilities": ["location"],
   "pebble": {
     "displayName": "myproject",
     "uuid": "7deedd27-f153-4064-9b77-57f25199bf38",
@@ -20,7 +21,8 @@
       "watchface": true
     },
     "messageKeys": [
-      "dummy"
+      "TEMPERATURE",
+      "CONDITIONS"
     ],
     "resources": {
       "media": [

@@ -3,6 +3,7 @@
 static Window *s_window;
 static TextLayer *s_time_layer;
 static GFont s_time_font;
+static TextLayer *s_weather_layer;
 static BitmapLayer *s_background_layer;
 static GBitmap *s_background_bitmap;
 
@@ -50,6 +51,20 @@ static void main_window_load(Window *window){
 
   // Add it as a child layer to the Window's root layer
   layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
+
+  // Create temperature Layer
+  s_weather_layer = text_layer_create(
+    GRect(0, PBL_IF_ROUND_ELSE(125, 120), bounds.size.w, 25));
+
+  // Style the text
+  text_layer_set_background_color(s_weather_layer, GColorClear);
+  text_layer_set_font(s_weather_layer,fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
+  text_layer_set_text_color(s_weather_layer, GColorWhite);
+  text_layer_set_text_alignment(s_weather_layer, GTextAlignmentCenter);
+  text_layer_set_text(s_weather_layer, "Loading...");
+
+  // Add it as a child layer to the Window's root layer
+  layer_add_child(window_layer,text_layer_get_layer(s_weather_layer));
 }
 
 static void main_window_unload(Window *window){
@@ -64,10 +79,56 @@ static void main_window_unload(Window *window){
 
   // Destroy TextLayer
   text_layer_destroy(s_time_layer);
+  text_layer_destroy(s_weather_layer);
+}
+
+static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+  static char temperature_buffer[8];
+  static char conditions_buffer[32];
+  static char weather_layer_buffer[32];
+
+  // Read tuples for data
+  Tuple *temp_tuple = dict_read_first(iterator);
+  Tuple *conditions_tuple = dict_read_next(iterator);
+
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Temp %d", (int)temp_tuple->value->int32);
+
+  // If all data is available, use it
+  if(temp_tuple && conditions_tuple) {
+    snprintf(temperature_buffer, sizeof(temperature_buffer), "%dF", (int)temp_tuple->value->int32);
+    snprintf(conditions_buffer, sizeof(conditions_buffer), "%s", conditions_tuple->value->cstring);
+    // Assemble full string and display
+    snprintf(weather_layer_buffer, sizeof(weather_layer_buffer), "%s, %s", temperature_buffer, conditions_buffer);
+    text_layer_set_text(s_weather_layer, weather_layer_buffer);
+  }
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time();
+  // Get weather update every 30 minutes
+  if(tick_time->tm_min % 30 == 0) {
+    // Begin dictionary
+    DictionaryIterator *iter;
+    app_message_outbox_begin(&iter);
+
+    // Add a key-value pair
+    dict_write_uint8(iter, 0, 0);
+
+    // Send the message!
+    app_message_outbox_send();
+  }
+}
+
+static void inbox_dropped_callback(AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
+}
+
+static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
+}
+
+static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
+  APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
 }
 
 static void init() {
@@ -90,6 +151,18 @@ static void init() {
 
   // Show current time
   update_time();
+
+  // Register callbacks
+  app_message_register_inbox_received(inbox_received_callback);
+  app_message_register_inbox_dropped(inbox_dropped_callback);
+  app_message_register_outbox_failed(outbox_failed_callback);
+  app_message_register_outbox_sent(outbox_sent_callback);
+
+  // Open AppMessage
+  const int inbox_size = 128;
+  const int outbox_size = 128;
+  app_message_open(inbox_size, outbox_size);
+
 }
 
 static void deinit() {
