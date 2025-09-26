@@ -11,6 +11,18 @@ static char conditions_buffer[32];
 static char weather_layer_buffer[32];
 static int s_battery_level;
 static Layer *s_battery_layer;
+static BitmapLayer *s_bt_icon_layer;
+static GBitmap *s_bt_icon_bitmap;
+
+static void bluetooth_callback(bool connected) {
+  // Show icon if disconnected
+  layer_set_hidden(bitmap_layer_get_layer(s_bt_icon_layer), connected);
+
+  if(!connected) {
+    // Issue a vibrating alert
+    vibes_double_pulse();
+  }
+}
 
 static void update_time() {
   // Get a tm structure
@@ -147,6 +159,13 @@ static void window_load(Window *window) {
   // Add to Window
   layer_add_child(window_get_root_layer(window), s_battery_layer);
 
+    // Create the Bluetooth icon GBitmap
+    s_bt_icon_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BT_ICON);
+
+    // Create the BitmapLayer to display the GBitmap
+    s_bt_icon_layer = bitmap_layer_create(GRect(59, 12, 30, 30));
+    bitmap_layer_set_bitmap(s_bt_icon_layer, s_bt_icon_bitmap);
+    layer_add_child(window_get_root_layer(window), bitmap_layer_get_layer(s_bt_icon_layer));
 
 }
 
@@ -156,6 +175,9 @@ static void window_unload(Window *window) {
 
     // Destroy BitmapLayer
     bitmap_layer_destroy(s_background_layer);
+    bitmap_layer_destroy(s_bt_icon_layer);
+    gbitmap_destroy(s_bt_icon_bitmap);
+    gbitmap_destroy(s_background_bitmap);
 
     // Unload GFont
     fonts_unload_custom_font(s_time_font);
@@ -201,4 +223,12 @@ void main_window_push() {
 
   // Ensure battery level is displayed from the start
   battery_callback(battery_state_service_peek());
+
+  // Register for Bluetooth connection updates
+    connection_service_subscribe((ConnectionHandlers) {
+    .pebble_app_connection_handler = bluetooth_callback
+    });
+
+  // Show current connection state
+  bluetooth_callback(connection_service_peek_pebble_app_connection());
 }
