@@ -6,6 +6,11 @@ static GFont s_time_font;
 static TextLayer *s_weather_layer;
 static BitmapLayer *s_background_layer;
 static GBitmap *s_background_bitmap;
+static char temperature_buffer[8];
+static char conditions_buffer[32];
+static char weather_layer_buffer[32];
+static int s_battery_level;
+static Layer *s_battery_layer;
 
 static void update_time() {
   // Get a tm structure
@@ -20,6 +25,21 @@ static void update_time() {
   // Display this time on the TextLayer
   text_layer_set_text(s_time_layer, s_buffer);
 
+}
+
+static void battery_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+
+  // Find the width of the bar (total width = 114px)
+  int width = (s_battery_level * 114) / 100;
+
+  // Draw the background
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+
+  // Draw the bar
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_rect(ctx, GRect(0, 0, width, bounds.size.h), 0, GCornerNone);
 }
 
 static void main_window_load(Window *window){
@@ -65,6 +85,13 @@ static void main_window_load(Window *window){
 
   // Add it as a child layer to the Window's root layer
   layer_add_child(window_layer,text_layer_get_layer(s_weather_layer));
+
+  // Create battery meter Layer
+  s_battery_layer = layer_create(GRect(14, 54, 115, 2));
+  layer_set_update_proc(s_battery_layer, battery_update_proc);
+
+  // Add to Window
+  layer_add_child(window_get_root_layer(window), s_battery_layer);
 }
 
 static void main_window_unload(Window *window){
@@ -80,13 +107,10 @@ static void main_window_unload(Window *window){
   // Destroy TextLayer
   text_layer_destroy(s_time_layer);
   text_layer_destroy(s_weather_layer);
+  layer_destroy(s_battery_layer);
 }
 
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
-  static char temperature_buffer[8];
-  static char conditions_buffer[32];
-  static char weather_layer_buffer[32];
-
   // Read tuples for data
   Tuple *temp_tuple = dict_read_first(iterator);
   Tuple *conditions_tuple = dict_read_next(iterator);
@@ -131,6 +155,13 @@ static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
   APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
 }
 
+static void battery_callback(BatteryChargeState state) {
+  // Record the new battery level
+  s_battery_level = state.charge_percent;
+  // Update meter
+  layer_mark_dirty(s_battery_layer);
+}
+
 static void init() {
   // Create main Window element and assign to pointer
   s_window = window_create();
@@ -163,6 +194,11 @@ static void init() {
   const int outbox_size = 128;
   app_message_open(inbox_size, outbox_size);
 
+  // Register for battery level updates
+  battery_state_service_subscribe(battery_callback);
+
+  // Ensure battery level is displayed from the start
+  battery_callback(battery_state_service_peek());
 }
 
 static void deinit() {
